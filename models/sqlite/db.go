@@ -101,8 +101,8 @@ func OpenSqlite(cfg *config.SqliteConfig) (repo.Repo, error) {
 	}
 
 	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
-
+	sqlDB.SetMaxIdleConns(0)
+	db = db.Debug()
 	return &SqlLiteRepo{
 		db,
 	}, nil
