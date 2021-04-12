@@ -263,7 +263,9 @@ func newSectorInfoRepo(db *gorm.DB) *sectorInfoRepo {
 func (s *sectorInfoRepo) GetSectorInfoByID(sectorNumber uint64) (*types.SectorInfo, error) {
 	var sectorInfo sectorInfo
 	err := s.DB.Debug().Table("sectors_infos").
-		First(&sectorInfo, "sector_number=?", sectorNumber).Error
+		Limit(1).
+		Where("sector_number=?", sectorNumber).
+		Take(&sectorInfo).Error
 	if err != nil {
 		return nil, err
 	}
