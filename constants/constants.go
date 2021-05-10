@@ -10,11 +10,10 @@ const (
 	NewestNetworkVersion = network.Version9
 	MessageConfidence    = uint64(5)
 	BlocksPerEpoch       = uint64(5)
-	ForkLengthThreshold2 = policy.ChainFinality
 )
 
 var (
-	FullAPIVersion   = newVer(1, 2, 0)
+	FullAPIVersion   = newVer(1, 3, 0)
 	MinerAPIVersion  = newVer(1, 0, 1)
 	WorkerAPIVersion = newVer(1, 0, 0)
 
