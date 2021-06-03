@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"github.com/filecoin-project/venus-sealer/types"
+	"strings"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
@@ -332,10 +333,10 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector types.Sec
 	log.Info("Sector precommitted: ", sector.SectorNumber)
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.PreCommitMessage)
 	if err != nil {
-		if xerrors.Is(err, api.ErrFailMsg) {
+		if isUnRecoverError(err.Error()) {
 			return ctx.Send(SectorRemove{})
 		} else {
-			return ctx.Send(SectorChainPreCommitFailed{err})
+			return ctx.Send(SectorRetryPreCommit{})
 		}
 	}
 
@@ -524,10 +525,10 @@ func (m *Sealing) handleCommitWait(ctx statemachine.Context, sector types.Sector
 
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.CommitMessage)
 	if err != nil {
-		if xerrors.Is(err, api.ErrFailMsg) {
+		if isUnRecoverError(err.Error()) {
 			return ctx.Send(SectorRemove{})
 		} else {
-			return ctx.Send(SectorCommitFailed{xerrors.Errorf("failed to wait for porep inclusion: %w", err)})
+			return ctx.Send(SectorRetrySubmitCommit{})
 		}
 	}
 
@@ -586,4 +587,10 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector types.Sec
 	// TODO: Auto-extend if set
 
 	return nil
+}
+
+func isUnRecoverError(errString string) bool {
+	return !(strings.Contains(errString, "failed to submit proof for bulk verification (RetCode=32)") ||
+		strings.Contains(errString, "not enough funds") ||
+		strings.Contains(errString, "unlocked balance can not repay fee debt"))
 }
