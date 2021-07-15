@@ -3,6 +3,7 @@ package sealing
 import (
 	"bytes"
 	"context"
+	"strings"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
@@ -426,10 +427,10 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector types.Sec
 	log.Info("Sector precommitted: ", sector.SectorNumber)
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.PreCommitMessage)
 	if err != nil {
-		if xerrors.Is(err, api.ErrFailMsg) {
-			return ctx.Send(SectorRemove{})
+		if forceHandledErr(err.Error()) {
+			return ctx.Send(SectorRetryPreCommit{})
 		} else {
-			return ctx.Send(SectorChainPreCommitFailed{err})
+			return ctx.Send(SectorChainPreCommitFailed{xerrors.Errorf("precommit wait receive error from messager %v", err)})
 		}
 	}
 
@@ -702,10 +703,10 @@ func (m *Sealing) handleCommitWait(ctx statemachine.Context, sector types.Sector
 
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.CommitMessage)
 	if err != nil {
-		if xerrors.Is(err, api.ErrFailMsg) {
-			return ctx.Send(SectorRemove{})
+		if forceHandledErr(err.Error()) {
+			return ctx.Send(SectorRetrySubmitCommit{})
 		} else {
-			return ctx.Send(SectorCommitFailed{xerrors.Errorf("failed to wait for porep inclusion: %w", err)})
+			return ctx.Send(SectorCommitFailed{xerrors.Errorf("commit receive error from messager %v", err)})
 		}
 	}
 
@@ -764,4 +765,9 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector types.Sec
 	// TODO: Auto-extend if set
 
 	return nil
+}
+
+func forceHandledErr(errString string) bool {
+	return strings.Contains(errString, "not enough funds") ||
+		strings.Contains(errString, "unlocked balance can not repay fee debt")
 }
