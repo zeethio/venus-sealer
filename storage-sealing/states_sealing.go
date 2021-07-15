@@ -427,7 +427,7 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector types.Sec
 	log.Info("Sector precommitted: ", sector.SectorNumber)
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.PreCommitMessage)
 	if err != nil {
-		if forceHandledErr(err.Error()) {
+		if isResendError(err.Error()) {
 			return ctx.Send(SectorRetryPreCommit{})
 		} else {
 			return ctx.Send(SectorChainPreCommitFailed{xerrors.Errorf("precommit wait receive error from messager %v", err)})
@@ -703,7 +703,7 @@ func (m *Sealing) handleCommitWait(ctx statemachine.Context, sector types.Sector
 
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.CommitMessage)
 	if err != nil {
-		if forceHandledErr(err.Error()) {
+		if isResendError(err.Error()) {
 			return ctx.Send(SectorRetrySubmitCommit{})
 		} else {
 			return ctx.Send(SectorCommitFailed{xerrors.Errorf("commit receive error from messager %v", err)})
@@ -767,7 +767,7 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector types.Sec
 	return nil
 }
 
-func forceHandledErr(errString string) bool {
+func isResendError(errString string) bool {
 	return strings.Contains(errString, "not enough funds") ||
 		strings.Contains(errString, "unlocked balance can not repay fee debt")
 }
