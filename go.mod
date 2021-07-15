@@ -31,7 +31,7 @@ require (
 	github.com/filecoin-project/specs-actors/v3 v3.1.1
 	github.com/filecoin-project/specs-actors/v5 v5.0.1
 	github.com/filecoin-project/specs-storage v0.1.1-0.20201105051918-5188d9774506
-	github.com/filecoin-project/venus v1.0.3-0.20210715055355-5a8d6cf690f0
+	github.com/filecoin-project/venus v1.0.3-0.20210715064031-619bfd4e88bb
 	github.com/filecoin-project/venus-messager v1.1.0
 	github.com/gbrlsnchs/jwt/v3 v3.0.0
 	github.com/google/uuid v1.2.0
