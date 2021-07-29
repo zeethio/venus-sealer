@@ -60,8 +60,14 @@ func (message *Messager) WaitMessage(ctx context.Context, id string, confidence 
 			case types.ReplacedMsg:
 				fallthrough
 			case types.OnChainMsg:
-				if msg.Confidence > int64(confidence) {
-					return msg, nil
+				if confidence == 0 {
+					if msg.Confidence == 1 {
+						return msg, nil
+					}
+				} else {
+					if msg.Confidence >= int64(confidence) {
+						return msg, nil
+					}
 				}
 				continue
 			//Error
