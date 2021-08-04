@@ -1,6 +1,7 @@
 package sectorstorage
 
 import (
+	"sort"
 	"time"
 
 	"context"
@@ -25,6 +26,9 @@ func (m *Manager) WorkerStats() map[uuid.UUID]storiface.WorkerStats {
 			for t, _ := range taskTypes {
 				tasks = append(tasks, t)
 			}
+			sort.Slice(tasks, func(i, j int) bool {
+				return tasks[i].Less(tasks[j])
+			})
 		}
 
 		out[uuid.UUID(id)] = storiface.WorkerStats{
