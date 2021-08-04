@@ -114,7 +114,7 @@ var sealingWorkersCmd = &cli.Command{
 				types.SizeStr(types.NewInt(stat.Info.Resources.MemReserved+stat.MemUsedMax)),
 				types.SizeStr(types.NewInt(vmem)))
 
-			fmt.Print("Task:")
+			fmt.Print("\tTask:")
 			for _, task := range stat.Tasks {
 				fmt.Print(task.Short(), " ")
 			}
