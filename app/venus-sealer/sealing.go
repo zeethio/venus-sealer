@@ -116,7 +116,7 @@ var sealingWorkersCmd = &cli.Command{
 
 			fmt.Print("Task:")
 			for _, task := range stat.Tasks {
-				fmt.Print(task)
+				fmt.Print(task.Short(), " ")
 			}
 			fmt.Println()
 
