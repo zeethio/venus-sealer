@@ -98,7 +98,7 @@ func (evt SectorPieceAdded) apply(state *types.SectorInfo) {
 type SectorAddPieceFailed struct{ error }
 
 func (evt SectorAddPieceFailed) FormatError(xerrors.Printer) (next error) { return evt.error }
-func (evt SectorAddPieceFailed) apply(si *types.SectorInfo)                     {}
+func (evt SectorAddPieceFailed) apply(si *types.SectorInfo)               {}
 
 type SectorStartPacking struct{}
 
@@ -109,6 +109,7 @@ func (evt SectorStartPacking) Ignore() {}
 type SectorPacked struct{ FillerPieces []abi.PieceInfo }
 
 func (evt SectorPacked) apply(state *types.SectorInfo) {
+	state.Pieces = nil
 	for idx := range evt.FillerPieces {
 		state.Pieces = append(state.Pieces, types.Piece{
 			Piece:    evt.FillerPieces[idx],

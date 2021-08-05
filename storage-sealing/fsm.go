@@ -81,6 +81,7 @@ var fsmPlanners = map[types.SectorState]func(events []statemachine.Event, state 
 		on(SectorPreCommitLanded{}, types.WaitSeed),
 		on(SectorDealsExpired{}, types.DealsExpired),
 		on(SectorInvalidDealIDs{}, types.RecoverDealIDs),
+		on(SectorCommitSubmitted{}, types.CommitWait),
 	),
 	types.SubmitPreCommitBatch: planOne(
 		on(SectorPreCommitBatchSent{}, types.PreCommitBatchWait),
@@ -311,7 +312,7 @@ func (m *Sealing) plan(events []statemachine.Event, state *types.SectorInfo) (fu
 
 	processed, err := p(events, state)
 	if err != nil {
-		return nil, 0, xerrors.Errorf("running planner for state %s failed: %w", state.State, err)
+		return nil, 0, xerrors.Errorf("running planner for state %d %s failed: %w", state.SectorNumber, state.State, err)
 	}
 
 	/////

@@ -3,6 +3,7 @@ package sealing
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
@@ -46,6 +47,9 @@ func (m *Sealing) handlePacking(ctx statemachine.Context, sector types.SectorInf
 
 	log.Infow("performing filling up rest of the sector...", "sector", sector.SectorNumber)
 
+	oldPieces := sector.Pieces
+	sector.Pieces = nil //set to garbage
+
 	var allocated abi.UnpaddedPieceSize
 	for _, piece := range sector.Pieces {
 		allocated += piece.Piece.Size.Unpadded()
@@ -71,11 +75,20 @@ func (m *Sealing) handlePacking(ctx statemachine.Context, sector types.SectorInf
 		log.Warnf("Creating %d filler pieces for sector %d", len(fillerSizes), sector.SectorNumber)
 	}
 
+	fmt.Println("generate unsealer data on local", sector.SectorNumber, len(fillerSizes), ubytes, allocated)
+
 	fillerPieces, err := m.padSector(sector.SealingCtx(ctx.Context()), m.minerSector(sector.SectorType, sector.SectorNumber), sector.ExistingPieceSizes(), fillerSizes...)
 	if err != nil {
 		return xerrors.Errorf("filling up the sector (%v): %w", fillerSizes, err)
 	}
 
+	if len(oldPieces) > 0 {
+		for index, piece := range fillerPieces {
+			if oldPieces[index].Piece.PieceCID != piece.PieceCID {
+				panic("piece not match")
+			}
+		}
+	}
 	return ctx.Send(SectorPacked{FillerPieces: fillerPieces})
 }
 
@@ -162,6 +175,13 @@ func (m *Sealing) getTicket(ctx statemachine.Context, sector types.SectorInfo) (
 }
 
 func (m *Sealing) handleGetTicket(ctx statemachine.Context, sector types.SectorInfo) error {
+	fmt.Println("*#####**", sector)
+	if len(sector.TicketValue) > 0 {
+		return ctx.Send(SectorTicket{
+			TicketValue: sector.TicketValue,
+			TicketEpoch: sector.TicketEpoch,
+		})
+	}
 	ticketValue, ticketEpoch, allocated, err := m.getTicket(ctx, sector)
 	if err != nil {
 		if allocated {
@@ -184,6 +204,17 @@ func (m *Sealing) handleGetTicket(ctx statemachine.Context, sector types.SectorI
 }
 
 func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector types.SectorInfo) error {
+	fmt.Println("handlePreCommit1 ", sector.SectorNumber.String())
+	pc1o, err := m.sealer.SealPreCommit1(sector.SealingCtx(ctx.Context()), m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.PieceInfos())
+	if err != nil {
+		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+	}
+
+	return ctx.Send(SectorPreCommit1{
+		PreCommit1Out: pc1o,
+	})
+	//recover not need below
+
 	if err := checkPieces(ctx.Context(), m.maddr, sector, m.api); err != nil { // Sanity check state
 		switch err.(type) {
 		case *ErrApi:
@@ -230,7 +261,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector types.Sector
 		}
 	}
 
-	pc1o, err := m.sealer.SealPreCommit1(sector.SealingCtx(ctx.Context()), m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.PieceInfos())
+	pc1o, err = m.sealer.SealPreCommit1(sector.SealingCtx(ctx.Context()), m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.PieceInfos())
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 	}
@@ -248,6 +279,15 @@ func (m *Sealing) handlePreCommit2(ctx statemachine.Context, sector types.Sector
 
 	if cids.Unsealed == cid.Undef {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(2) returned undefined CommD")})
+	}
+
+	if sector.CommR != nil {
+		if !(*sector.CommR).Equals(cids.Sealed) {
+			err := xerrors.Errorf("commr not match %d %s %s", sector.SectorNumber, sector.CommR, cids.Sealed)
+			panic(err)
+			//return ctx.Send(SectorRemove{})
+			//panic(xerrors.Errorf("commr not match %d %s %s", sector.SectorNumber, sector.CommR, cids.Sealed))
+		}
 	}
 
 	return ctx.Send(SectorPreCommit2{
@@ -358,6 +398,12 @@ func (m *Sealing) handlePreCommitting(ctx statemachine.Context, sector types.Sec
 
 	params, deposit, tok, err := m.preCommitParams(ctx, sector)
 	if params == nil || err != nil {
+		if len(sector.PreCommitMessage) > 0 && len(sector.CommitMessage) > 0 {
+			return ctx.Send(SectorCommitSubmitted{
+				Message: sector.CommitMessage,
+			})
+			//return ctx.Send(SectorPreCommitted{Message: sector.PreCommitMessage, PreCommitDeposit: sector.PreCommitDeposit, PreCommitInfo: sector.PreCommitDeposit})
+		}
 		return err
 	}
 
@@ -422,12 +468,18 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector types.Sec
 		return ctx.Send(SectorChainPreCommitFailed{xerrors.Errorf("precommit message was nil")})
 	}
 
+	if len(sector.PreCommitTipSet) > 0 {
+		return ctx.Send(SectorPreCommitLanded{TipSet: sector.PreCommitTipSet})
+	}
+
 	// would be ideal to just use the events.Called handler, but it wouldn't be able to handle individual message timeouts
 	log.Info("Sector precommitted: ", sector.SectorNumber)
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.PreCommitMessage)
 	if err != nil {
 		if xerrors.Is(err, api.ErrFailMsg) {
-			return ctx.Send(SectorRemove{})
+			//unable to find p2 message
+
+			//return ctx.Send(SectorRemove{})
 		} else {
 			return ctx.Send(SectorChainPreCommitFailed{err})
 		}
@@ -453,6 +505,11 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector types.Sec
 }
 
 func (m *Sealing) handleWaitSeed(ctx statemachine.Context, sector types.SectorInfo) error {
+	if len(sector.SeedValue) > 0 {
+		_ = ctx.Send(SectorSeedReady{SeedValue: sector.SeedValue, SeedEpoch: sector.SeedEpoch})
+		return nil
+	}
+
 	tok, _, err := m.api.ChainHead(ctx.Context())
 	if err != nil {
 		log.Errorf("handleWaitSeed: api error, not proceeding: %+v", err)
@@ -700,10 +757,27 @@ func (m *Sealing) handleCommitWait(ctx statemachine.Context, sector types.Sector
 		return ctx.Send(SectorCommitFailed{xerrors.Errorf("entered commit wait with no commit cid")})
 	}
 
+	if len(sector.CommitMessage) > 0 {
+		head, _, err := m.api.ChainHead(ctx.Context())
+		if err != nil {
+			panic("fail to get head")
+		}
+		si, err := m.api.StateSectorGetInfo(ctx.Context(), m.maddr, sector.SectorNumber, head)
+		if err != nil {
+			return ctx.Send(SectorCommitFailed{xerrors.Errorf("proof validation failed, calling StateSectorGetInfo: %w", err)})
+		}
+		if si == nil {
+			return ctx.Send(SectorCommitFailed{xerrors.Errorf("proof validation failed, sector not found in sector set after cron")})
+		}
+
+		return ctx.Send(SectorProving{})
+	}
+
 	mw, err := m.api.MessagerWaitMsg(ctx.Context(), sector.CommitMessage)
 	if err != nil {
 		if xerrors.Is(err, api.ErrFailMsg) {
-			return ctx.Send(SectorRemove{})
+			panic("unable to find sector c2 message")
+			//	return ctx.Send(SectorRemove{})
 		} else {
 			return ctx.Send(SectorCommitFailed{xerrors.Errorf("failed to wait for porep inclusion: %w", err)})
 		}
