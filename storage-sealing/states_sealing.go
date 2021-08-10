@@ -220,7 +220,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector types.Sector
 		}
 
 		if !bytes.Equal(pc1o, sector.PreCommit1Out) {
-			panic(fmt.Errorf("redo precommit1 fail out not equal receive %v expect %v", pc1o, sector.PreCommit1Out))
+			panic(fmt.Errorf("redo precommit1 %d fail out not equal receive %v expect %v", sector.SectorNumber, pc1o, sector.PreCommit1Out))
 		}
 
 		return ctx.Send(SectorPreCommit1{
