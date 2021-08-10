@@ -213,15 +213,17 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector types.Sector
 		return err
 	}
 	if isRecover {
-		log.Infof("recover %d precommit1 ", sector.SectorNumber.String())
+		log.Infof("recover %d precommit1 %v", sector.SectorNumber.String(), sector.PieceInfos())
 		pc1o, err := m.sealer.SealPreCommit1(sector.SealingCtx(ctx.Context()), m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.PieceInfos())
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
 
-		if !bytes.Equal(pc1o, sector.PreCommit1Out) {
+		fmt.Println(sector.TicketValue)
+		/*if !bytes.Equal(pc1o, sector.PreCommit1Out) {
 			return ctx.Send(SectorSealPreCommit1Failed{fmt.Errorf("redo precommit1 %d fail out not equal receive %v expect %v", sector.SectorNumber, pc1o, sector.PreCommit1Out)})
-		}
+		}*/
+
 
 		return ctx.Send(SectorPreCommit1{
 			PreCommit1Out: pc1o,
@@ -300,6 +302,7 @@ func (m *Sealing) handlePreCommit2(ctx statemachine.Context, sector types.Sector
 		return err
 	}
 	if isRecover {
+		log.Infof("recover %d precommit2 ", sector.SectorNumber.String())
 		if sector.CommR != nil &&!(*sector.CommR).Equals(cids.Sealed) {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("commr not match %d %s %s", sector.SectorNumber, sector.CommR, cids.Sealed)})
 		}
@@ -418,6 +421,7 @@ func (m *Sealing) handlePreCommitting(ctx statemachine.Context, sector types.Sec
 			return err
 		}
 		if isRecover {
+			log.Infof("recover %d skip committing ", sector.SectorNumber.String())
 			// skip C1 C2
 			return ctx.Send(SectorCommitSubmitted{
 				Message: sector.CommitMessage,
@@ -493,6 +497,7 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector types.Sec
 		return err
 	}
 	if isRecover {
+		log.Infof("recover %d precommit wait ", sector.SectorNumber.String())
 		return ctx.Send(SectorPreCommitLanded{TipSet: sector.PreCommitTipSet})
 	}
 
@@ -528,6 +533,7 @@ func (m *Sealing) handleWaitSeed(ctx statemachine.Context, sector types.SectorIn
 		return err
 	}
 	if isRecover {
+		log.Infof("recover %d skip wait seed ", sector.SectorNumber.String())
 		_ = ctx.Send(SectorSeedReady{SeedValue: sector.SeedValue, SeedEpoch: sector.SeedEpoch})
 		return nil
 	}
@@ -784,6 +790,7 @@ func (m *Sealing) handleCommitWait(ctx statemachine.Context, sector types.Sector
 		return err
 	}
 	if isRecover {
+		log.Infof("recover %d commit wait ", sector.SectorNumber.String())
 		head, _, err := m.api.ChainHead(ctx.Context())
 		if err != nil {
 			panic("fail to get head")
