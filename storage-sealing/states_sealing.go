@@ -220,7 +220,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector types.Sector
 		}
 
 		if !bytes.Equal(pc1o, sector.PreCommit1Out) {
-			panic("redo precommit1 fail out not equal")
+			panic(fmt.Errorf("redo precommit1 fail out not equal receive %v expect %v", pc1o, sector.PreCommit1Out))
 		}
 
 		return ctx.Send(SectorPreCommit1{
@@ -301,7 +301,7 @@ func (m *Sealing) handlePreCommit2(ctx statemachine.Context, sector types.Sector
 	}
 	if isRecover {
 		if sector.CommR != nil &&!(*sector.CommR).Equals(cids.Sealed) {
-			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("commr not match %d %s %s", sector.SectorNumber, sector.CommR, cids.Sealed)})
+			panic(xerrors.Errorf("commr not match %d %s %s", sector.SectorNumber, sector.CommR, cids.Sealed))
 		}
 	}
 
