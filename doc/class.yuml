@@ -1,0 +1,13 @@
+// {type:class}
+// {direction:topDown}
+// {generate:true}
+
+[note: Venus sealer class diagram{bg:cornsilk}]
+[VenusGateway]++-[GatewayAPI]
+
+[GatewayAPI]+->[ProofEventStream|minerConnections, authClient|ComputeProof]
+
+[GatewayAPI]+->[WalletEventStream|minerConnections, authClient|ComputeProof]
+
+[GatewayAPI]uses-.->[auth.go|seckey|MakeToken, Verify]
+[auth.go]uses-.->[vanus-auth/auth2]
